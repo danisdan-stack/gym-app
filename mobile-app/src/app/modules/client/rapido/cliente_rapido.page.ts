@@ -12,6 +12,8 @@ import {
 import { addIcons } from 'ionicons';
 import { checkmarkCircle, arrowBack, cash, card } from 'ionicons/icons';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { lastValueFrom } from 'rxjs'; // 👈 AÑADIR esta importación
 
 @Component({
   selector: 'app-cliente-rapido',
@@ -26,8 +28,8 @@ import { Router } from '@angular/router';
     IonSpinner, IonBackButton, IonButtons,
     IonChip, IonText
   ],
-  templateUrl: './cliente_rapido.page.html',  // Tu template HTML
-  styleUrls: ['./cliente_rapido.page.scss']   // Tus estilos CSS
+  templateUrl: './cliente_rapido.page.html',
+  styleUrls: ['./cliente_rapido.page.scss']
 })
 export class ClienteRapidoPage {
   cliente = {
@@ -42,37 +44,45 @@ export class ClienteRapidoPage {
   toastColor = 'success';
   
   clienteCreado: any = null;
+  
+  // URL base del backend en Render
+  private apiUrl = 'https://gym-app-n77p.onrender.com/api';
 
-  constructor(private router: Router) {
+  constructor(
+    private router: Router,
+    private http: HttpClient // ✅ HttpClient inyectado
+  ) {
     addIcons({ checkmarkCircle, arrowBack, cash, card });
   }
 
   async crearCliente() {
-    // Validaciones...
+    // Validaciones
     if (!this.cliente.nombre.trim()) {
       this.mostrarToast('Ingresa el nombre', 'warning');
       return;
     }
     
-    // ... más validaciones
+    if (!this.cliente.apellido.trim()) {
+      this.mostrarToast('Ingresa el apellido', 'warning');
+      return;
+    }
     
+    if (!this.cliente.celular.trim()) {
+      this.mostrarToast('Ingresa el celular', 'warning');
+      return;
+    }
+
     this.loading = true;
 
     try {
-      
-      const response = await fetch('http://localhost:3000/api/clientes/rapido', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // ✅ USAR HttpClient en lugar de fetch (CONSISTENCIA)
+      const data = await lastValueFrom(
+        this.http.post(`${this.apiUrl}/clientes/rapido`, {
           nombre: this.cliente.nombre,
           apellido: this.cliente.apellido,
           celular: this.cliente.celular
         })
-      });
-
-      const data = await response.json();
+      ) as any;
 
       if (data.success) {
         this.clienteCreado = data.data;
@@ -88,11 +98,21 @@ export class ClienteRapidoPage {
           });
         }, 1500);
       } else {
-        this.mostrarToast(`❌ ${data.message}`, 'danger');
+        this.mostrarToast(`❌ ${data.message || 'Error desconocido'}`, 'danger');
       }
     } catch (error: any) {
       console.error('Error:', error);
-      this.mostrarToast('❌ Error de conexión', 'danger');
+      
+      // Mensaje específico para timeout de Render
+      if (error.name === 'HttpErrorResponse') {
+        if (error.status === 0) {
+          this.mostrarToast('❌ Error de conexión. Verifica que el servidor esté activo (Render puede estar iniciando)', 'warning');
+        } else {
+          this.mostrarToast(`❌ Error del servidor: ${error.status}`, 'danger');
+        }
+      } else {
+        this.mostrarToast(`❌ Error: ${error.message}`, 'danger');
+      }
     } finally {
       this.loading = false;
     }

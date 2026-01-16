@@ -1,14 +1,13 @@
 {
-  "name": "mobile-app",
-  "integrations": {
-    "capacitor": {}
-  },
-  "type": "angular-standalone",
   "proxy": {
     "/api": {
-      "target": "http://localhost:3000",
+      "target": "https://gym-app-n77p.onrender.com",
       "secure": false,
-      "changeOrigin": true
+      "changeOrigin": true,
+      "logLevel": "debug", 
+      "pathRewrite": {
+        "^/api": "/api"
+      }
     }
   }
 }
