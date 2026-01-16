@@ -10,6 +10,7 @@ import entrenadorRoutes from './routes/entrenador.routes';
 import authRoutes from './routes/auth.routes';
 import clienteRoutes from './routes/cliente.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import pool from './config/database'; 
 // import twilioRoutes from './routes/twilio.routes'; // DESHABILITADO
 // Importar los controladores que necesitas
 import { 
@@ -43,7 +44,69 @@ app.use(express.urlencoded({ extended: true }));
 
 // 📁 SERVIR ARCHIVOS ESTÁTICOS (carnets PNG)
 app.use('/storage', express.static(path.join(__dirname, '../storage')));
-
+// ======================
+// DIAGNÓSTICO DE BASE DE DATOS
+// ======================
+app.get('/api/db-test', async (req, res) => {
+  console.log('🔍 Testing DB connection from endpoint...');
+  
+  try {
+    // 1. Verificar si pool está definido
+    if (!pool) {
+      return res.status(500).json({ error: 'Pool no inicializado' });
+    }
+    
+    // 2. Probar conexión básica
+    const timeResult = await pool.query('SELECT NOW() as current_time');
+    console.log('✅ SELECT NOW() funcionó');
+    
+    // 3. Verificar tabla clientes
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'clientes' 
+        AND table_schema = 'public'
+      ) as table_exists
+    `);
+    
+    const tableExists = tableCheck.rows[0].table_exists;
+    console.log('✅ Tabla clientes existe:', tableExists);
+    
+    // 4. Si existe, contar registros
+    let count = 0;
+    if (tableExists) {
+      const countResult = await pool.query('SELECT COUNT(*) FROM clientes');
+      count = parseInt(countResult.rows[0].count);
+      console.log('✅ Total clientes:', count);
+    }
+    
+    res.json({
+      status: 'success',
+      database: {
+        connected: true,
+        current_time: timeResult.rows[0].current_time,
+        table_exists: tableExists,
+        client_count: count
+      },
+      environment: {
+        node_env: process.env.NODE_ENV,
+        database_url_configured: !!process.env.DATABASE_URL
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('❌ DB Error:', error.message);
+    console.error('Error code:', error.code);
+    
+    res.status(500).json({
+      status: 'error',
+      error: error.message,
+      code: error.code,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack,
+      suggestion: 'Verificar conexión SSL a Supabase'
+    });
+  }
+});
 // ======================
 // REGISTRAR TODAS LAS RUTAS
 // ======================
