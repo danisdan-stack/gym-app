@@ -188,7 +188,7 @@ export const registrarPagoCliente = async (req: Request, res: Response) => {
       WHERE usuario_id = $2
     `;
     
-    await client.query(updateClienteQuery, [pago.fecha_vencimiento, cliente_id]);
+    await client.query(updateClienteQuery, [pago[0]?.fecha_vencimiento, cliente_id]);
     
     // 4. Generar carnet
     const carnetPNG = await carnetService.generarCarnetPNG(cliente, mes, año);
@@ -250,20 +250,20 @@ export const registrarPagoCliente = async (req: Request, res: Response) => {
       message: `✅ Pago registrado para ${cliente.nombre} ${cliente.apellido}`,
       data: {
         pago: {
-          id: pago.id,
-          fecha: pago.fecha_pago,
+          id: (pago as any)[0].id,
+          fecha: pago[0].fecha_pago,
           monto,
           mes,
           año,
           mes_nombre: mesNombre,
-          fecha_vencimiento: pago.fecha_vencimiento
+          fecha_vencimiento: pago[0].fecha_vencimiento
         },
         cliente: {
           id: cliente_id,
           nombre: cliente.nombre,
           apellido: cliente.apellido,
           telefono: cliente.telefono,
-          nueva_fecha_vencimiento: pago.fecha_vencimiento
+          fecha_vencimiento: pago[0].fecha_vencimiento
         },
         carnet: {
           id: carnetId,
