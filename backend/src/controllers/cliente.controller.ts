@@ -193,107 +193,87 @@ export const registrarCliente = async (req: Request, res: Response) => {
 };
 
 export const listarClientes = async (req: Request, res: Response) => {
-  console.log('🎯 /api/clientes - MODO SEGURO ACTIVADO');
+  console.log('🎯 /api/clientes - VERSIÓN FINAL CON AMBOS IDS');
   
   try {
-    // 1. Query DIRECTA y SIMPLE - SIN LIMIT
-    console.log('🔍 Ejecutando query directa...');
+    // Query SIMPLE y CONFIABLE según tu estructura
     const query = `
       SELECT 
-        c.id,                    -- ← ID de la tabla cliente
-        c.usuario_id,            -- ← RELACIÓN con usuario
-        c.nombre,
-        c.apellido,
-        c.telefono,
-        c.email,                 -- ← SI EXISTE
-        c.direccion,             -- ← SI EXISTE
-        c.estado_cuota,
-        c.fecha_inscripcion,
-        c.fecha_vencimiento,
-        c.created_at,
-        c.updated_at,
-        u.username,              -- ← DATOS DEL USUARIO
-        u.email as usuario_email
-      FROM cliente c
-      JOIN usuario u ON c.usuario_id = u.id
-      WHERE u.activo = true
-      ORDER BY c.fecha_inscripcion DESC
+        usuario_id,
+        nombre,
+        apellido,
+        telefono,
+        estado_cuota,
+        fecha_inscripcion,
+        fecha_vencimiento,
+        direccion,
+        creado_en,
+        actualizado_en
+      FROM cliente 
+      ORDER BY usuario_id
     `;
     
+    console.log('🔍 Ejecutando query...');
     const result = await pool.query(query);
-    
     console.log(`✅ ${result.rows.length} clientes encontrados`);
     
-    // 2. Formatear respuesta CORRECTAMENTE
-    const clientesFormateados = result.rows.map(cliente => ({
-      id: cliente.id || cliente.usuario_id,  // ← Mantener ambos
-      usuario_id: cliente.usuario_id,        // ← ¡INCLUIR usuario_id!
-      nombre: cliente.nombre?.trim() || '',
-      apellido: cliente.apellido?.trim() || '',
-      telefono: cliente.telefono?.trim() || '',
-      email: cliente.email || cliente.usuario_email || '',
-      direccion: cliente.direccion || '',
-      estado_cuota: cliente.estado_cuota || 'inactivo',
-      fecha_inscripcion: cliente.fecha_inscripcion,
-      fecha_vencimiento: cliente.fecha_vencimiento,
-      created_at: cliente.created_at,
-      updated_at: cliente.updated_at,
-      username: cliente.username || ''
-    }));
+    // ✅ FORMATO CORRECTO para frontend
+    const clientesFormateados = result.rows.map(cliente => {
+      // El ID para frontend es usuario_id
+      const usuarioId = cliente.usuario_id;
+      
+      return {
+        id: usuarioId,                    // ← OBLIGATORIO para frontend
+        usuario_id: usuarioId,            // ← OBLIGATORIO para consistencia
+        nombre: cliente.nombre?.trim() || '',
+        apellido: cliente.apellido?.trim() || '',
+        telefono: cliente.telefono?.trim() || '',
+        email: '',                        // Si no existe en tabla
+        direccion: cliente.direccion || '',
+        estado_cuota: cliente.estado_cuota || 'inactivo',
+        fecha_inscripcion: cliente.fecha_inscripcion,
+        fecha_vencimiento: cliente.fecha_vencimiento,
+        creado_en: cliente.creado_en,
+        actualizado_en: cliente.actualizado_en,
+        entrenador_id: null               // Si no existe
+      };
+    });
+    
+    // ✅ DEBUG: Mostrar primer cliente
+    if (clientesFormateados.length > 0) {
+      console.log('📋 Primer cliente formateado:', {
+        id: clientesFormateados[0].id,
+        usuario_id: clientesFormateados[0].usuario_id,
+        nombre: clientesFormateados[0].nombre,
+        tiene_usuario_id: 'usuario_id' in clientesFormateados[0]
+      });
+    }
     
     res.json({
       success: true,
-      count: result.rows.length,
+      count: clientesFormateados.length,
       data: clientesFormateados,
       _debug: {
-        method: 'query_completa',
-        raw_count: result.rowCount,
-        timestamp: new Date().toISOString()
+        method: 'query_final',
+        has_usuario_id: true,
+        timestamp: new Date().toISOString(),
+        note: 'id = usuario_id para compatibilidad con frontend'
       }
     });
     
   } catch (error: any) {
-    console.error('🔥 ERROR en listarClientes:', error.message);
+    console.error('🔥 ERROR CRÍTICO en listarClientes:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     
-    // Si la tabla no existe o tiene problemas
-    if (error.code === '42P01' || error.message.includes('no existe')) {
-      console.log('⚠️ Tabla cliente no existe, intentando query simple...');
-      
-      // Query alternativa más simple
-      try {
-        const simpleQuery = 'SELECT * FROM cliente ORDER BY id';
-        const simpleResult = await pool.query(simpleQuery);
-        
-        const clientesSimples = simpleResult.rows.map(cliente => ({
-          id: cliente.id,
-          usuario_id: cliente.usuario_id || null,
-          nombre: cliente.nombre?.trim() || '',
-          apellido: cliente.apellido?.trim() || '',
-          telefono: cliente.telefono?.trim() || '',
-          estado_cuota: cliente.estado_cuota || 'inactivo',
-          fecha_inscripcion: cliente.fecha_inscripcion,
-          fecha_vencimiento: cliente.fecha_vencimiento
-        }));
-        
-        return res.json({
-          success: true,
-          count: clientesSimples.length,
-          data: clientesSimples,
-          _debug: {
-            method: 'query_simple_fallback',
-            warning: 'Tabla cliente sin join a usuario'
-          }
-        });
-      } catch (simpleError: any) {
-        console.error('Error en query simple:', simpleError);
-      }
-    }
-    
+    // Respuesta de error clara
     res.status(500).json({
       success: false,
-      message: 'Error en base de datos',
-      error: error.message,
-      code: error.code
+      message: 'Error obteniendo clientes',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      suggestion: 'Verificar conexión a la base de datos'
     });
   }
 };
