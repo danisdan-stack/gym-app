@@ -124,3 +124,20 @@ export const healthCheck = (req: Request, res: Response) => {
     }
   });
 };
+
+export const verCarnet = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    console.log(`👀 Ver carnet para ID: ${id}`);
+    
+    // Redirigir al endpoint de descarga
+    return res.redirect(`/api/carnets/descargar/${id}`);
+    
+  } catch (error: any) {
+    console.error('Error en verCarnet:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error accediendo al carnet'
+    });
+  }
+};
